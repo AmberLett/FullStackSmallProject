@@ -1,0 +1,308 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contacts</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f0f0;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            text-align: left;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .contactDiv {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Contacts</h1>
+        <form id="addContactForm">
+            <label for="firstName">First Name:</label>
+            <input type="text" id="firstName" name="firstName" required>
+            <br>
+            <label for="lastName">Last Name:</label>
+            <input type="text" id="lastName" name="lastName" required>
+            <br>
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+            <br>
+            <label for="phone">Phone:</label>
+            <input type="tel" id="phone" name="phone" required>
+            <br>
+            <button type="submit">Add Contact</button>
+        </form>
+        <p id="addContactMessage"></p>
+        <div id="contactsList">
+            <!-- Contacts will be displayed here -->
+        </div>
+    </div>
+
+    <script>
+        // Function to fetch and display contacts
+        function loadContacts() {
+            const userId = getUserId();
+
+            if (userId) {
+                fetch('http://cop4331-f23.com//LAMPAPI/GetContacts.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ "UserID": userId }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const contactsList = document.getElementById("contactsList");
+
+                    if (data.error) {
+                        contactsList.textContent = 'Error: ' + data.error;
+                    } else if (data.results && data.results.length > 0) {
+                        // Loop through the retrieved contacts and display them
+                        contactsList.innerHTML = ''; // Clear previous entries
+                        data.results.forEach(contact => {
+                            const contactDiv = document.createElement("div");
+                            contactDiv.className = "contactDiv";
+                            contactDiv.innerHTML = `
+                                <p>Name: ${contact.FirstName} ${contact.LastName}</p>
+                                <p>Email: ${contact.Email}</p>
+                                <p>Phone: ${contact.Phone}</p>
+                                <button onclick="deleteContact(${contact.ID})">Delete</button>
+                                <button class="editContactButton" data-id="${contact.ID}">Edit</button>
+                                <hr>
+                                <form class="editContactForm" style="display: none;">
+                                    <label for="editFirstName">Edit First Name:</label>
+                                    <input type="text" id="editFirstName" name="editFirstName" required>
+                                    <label for="editLastName">Edit Last Name:</label>
+                                    <input type="text" id="editLastName" name="editLastName" required>
+                                    <label for="editEmail">Edit Email:</label>
+                                    <input type="email" id="editEmail" name="editEmail" required>
+                                    <label for="editPhone">Edit Phone:</label>
+                                    <input type="tel" id="editPhone" name="editPhone" required>
+                                    <button type="submit">Save</button>
+                                </form>
+                            `;
+                            contactsList.appendChild(contactDiv);
+                        });
+
+                        // Add event listeners for edit buttons
+                        document.querySelectorAll(".editContactButton").forEach(button => {
+                            button.addEventListener("click", function () {
+                                const contactID = this.getAttribute("data-id");
+                                const contactDiv = this.closest(".contactDiv");
+                                const editForm = contactDiv.querySelector(".editContactForm");
+
+                                // Show the edit form for the selected contact
+                                editForm.style.display = "block";
+
+                                // Fetch the contact details to populate the edit form
+                                fetch('http://cop4331-f23.com//LAMPAPI/GetContact.php', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ "ID": contactID }),
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.error) {
+                                        // Handle error
+                                        console.error('Error:', data.error);
+                                    } else {
+                                        // Populate the edit form with contact details
+                                        editForm.querySelector("#editFirstName").value = data.FirstName;
+                                        editForm.querySelector("#editLastName").value = data.LastName;
+                                        editForm.querySelector("#editEmail").value = data.Email;
+                                        editForm.querySelector("#editPhone").value = data.Phone;
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error:', error);
+                                });
+                            });
+                        });
+
+                        // Add event listeners for edit contact forms
+                        document.querySelectorAll(".editContactForm").forEach(form => {
+                            form.addEventListener("submit", function (event) {
+                                event.preventDefault();
+
+                                const contactID = this.closest(".contactDiv").querySelector(".editContactButton").getAttribute("data-id");
+                                const editFirstName = this.querySelector("#editFirstName").value;
+                                const editLastName = this.querySelector("#editLastName").value;
+                                const editEmail = this.querySelector("#editEmail").value;
+                                const editPhone = this.querySelector("#editPhone").value;
+
+                                const contactData = {
+                                    "ID": contactID,
+                                    "FirstName": editFirstName,
+                                    "LastName": editLastName,
+                                    "Email": editEmail,
+                                    "Phone": editPhone,
+                                };
+
+                                // Send a POST request to edit the contact
+                                fetch('http://cop4331-f23.com//LAMPAPI/EditContact.php', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify(contactData),
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.error) {
+                                        // Handle error
+                                        console.error('Error:', data.error);
+                                    } else {
+                                        // Hide the edit form and reload the contact list
+                                        this.style.display = "none";
+                                        loadContacts();
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error:', error);
+                                });
+                            });
+                        });
+                    } else {
+                        contactsList.textContent = 'No contacts found.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        // Call the loadContacts function when the page loads
+        window.addEventListener("load", loadContacts);
+
+        // Function to add a contact
+        document.getElementById("addContactForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const firstName = document.getElementById("firstName").value;
+            const lastName = document.getElementById("lastName").value;
+            const email = document.getElementById("email").value;
+            const phone = document.getElementById("phone").value;
+
+            const contactData = {
+                "FirstName": firstName,
+                "LastName": lastName,
+                "Email": email,
+                "Phone": phone,
+                "UserID": getUserId()
+            };
+
+            fetch('http://cop4331-f23.com//LAMPAPI/AddContact.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(contactData),
+            })
+            .then(response => response.json())
+            .then(data => {
+                const addContactMessage = document.getElementById("addContactMessage");
+                if (data.error) {
+                    addContactMessage.textContent = 'Failed to add contact. ' + data.error;
+                } else {
+                    addContactMessage.textContent = 'Contact added successfully.';
+                    loadContacts(); // Refresh the contacts list after adding a contact
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+
+        function deleteContact(contactId) {
+            const userId = getUserId();
+
+            if (userId) {
+                fetch('http://cop4331-f23.com//LAMPAPI/DeleteContact.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ "ID": contactId }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error:', data.error);
+                    } else {
+                        // Reload the contacts list after deleting a contact
+                        loadContacts();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        // Your getUserId function here
+        function getUserId() {
+            // Get all cookies as a string
+            const cookies = document.cookie;
+
+            // Split the cookies into an array of individual cookies
+            const cookieArray = cookies.split(';');
+
+            // Loop through the cookieArray to find the 'userId' cookie
+            for (const cookie of cookieArray) {
+                const [name, value] = cookie.trim().split('=');
+
+                // Check if the cookie name is 'userId'
+                if (name === 'userId') {
+                    // Parse the user ID from the cookie value and return it
+                    return parseInt(value);
+                }
+            }
+
+            // If 'userId' cookie is not found, return null or handle it as needed
+            return null;
+        }
+    </script>
+</body>
+</html>
